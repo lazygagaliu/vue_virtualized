@@ -14,6 +14,11 @@
 <script>
 import Item from './Item.vue';
 
+const SCROLL_DIRECTION = {
+	TO_TOP: 'to_top',
+	TO_BOTTOM: 'to_bottom'
+};
+
 export default {
   name: 'Virtualized',
   components: {
@@ -57,16 +62,19 @@ export default {
     handleScroll(e) {
       console.log(e.target.scrollTop);
       const offset = e.target.scrollTop;
-      if (offset < this.$parent.$el.clientHeight * 3) return
+      const scrollDirection = offset > this.offset ? SCROLL_DIRECTION.TO_BOTTOM : SCROLL_DIRECTION.TO_TOP;
+      if (scrollDirection === SCROLL_DIRECTION.TO_BOTTOM && (offset < this.$parent.$el.clientHeight)) return
       const currentPage = this.pageArray.findIndex(page => this.heightsMap.get(page) > offset)
-      const lastItemOfCurrentPage = this.pageArray[currentPage];
-      console.log({ currentPage, lastItemOfCurrentPage });
+      // const lastItemOfCurrentPage = this.pageArray[currentPage];
+      // console.log({ currentPage, lastItemOfCurrentPage });
       this.displayedData = this.data.slice(this.pageArray[currentPage - 1], this.pageArray[currentPage + 2])
 
       const pageIndexBeforePage = this.pageArray[currentPage - 1];
       const pageIndexAfterPage = this.pageArray[currentPage + 2];
-      this.paddingTop = this.heightsMap.get(pageIndexBeforePage - 1);
-      this.paddingBottom = this.heightsMap.get(this.heightsMap.size - 1) - this.heightsMap.get(pageIndexAfterPage - 1);
+      this.offset = offset;
+      this.paddingTop = pageIndexBeforePage ? this.heightsMap.get(pageIndexBeforePage - 1) : 0;
+      this.paddingBottom = pageIndexAfterPage ? this.heightsMap.get(this.heightsMap.size - 1) - this.heightsMap.get(pageIndexAfterPage - 1) : 0;
+      console.log({ pageIndexBeforePage, pageIndexAfterPage });
     },
   },
   created() {
