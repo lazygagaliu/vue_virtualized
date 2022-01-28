@@ -1,18 +1,22 @@
 <template>
-  <div class="container">
+  <div class="container" ref="container" @scroll="handleScroll">
     <div class='float' :style="{ paddingTop: `${paddingTop}px`, paddingBottom: `${paddingBottom}px` }">
-      <div  v-for="item in displayedData" :key="item.id">
-        <Item @setHeight="(height) => cacheHeights(item.id, height)">
-            <div>{{ item.id }}</div>
-            <div>{{ item.content }}</div>
-        </Item>
-      </div>
+      <!-- <LoadingComponent v-if="isToTop" :options="{ root: $refs.container }" @handleCross="handleCross" /> -->
+      <LoadingComponent v-if="isToBottom" :options="{ root: $refs.container }" @handleCross="handleCross" >
+        <div v-for="item in displayedData" :key="item.id">
+          <Item @setHeight="(height) => cacheHeights(item.id, height)">
+              <div>{{ item.id }}</div>
+              <div>{{ item.content }}</div>
+          </Item>
+        </div>
+      </LoadingComponent>
     </div>
   </div>
 </template>
 
 <script>
 import Item from './Item.vue';
+import LoadingComponent from './LoadingComponent.vue';
 
 const SCROLL_DIRECTION = {
 	TO_TOP: 'to_top',
@@ -22,7 +26,8 @@ const SCROLL_DIRECTION = {
 export default {
   name: 'Virtualized',
   components: {
-    Item
+    Item,
+    LoadingComponent
   },
   data() {
     return {
@@ -30,7 +35,7 @@ export default {
       pageArray: [],
       displayedData: [],
       paddingTop: 0,
-      paddingBottom: 0
+      paddingBottom: 0,
     }
   },
   props: {
@@ -38,8 +43,20 @@ export default {
       type: Array,
       default: () => ([])
     },
+    direction: {
+      type: String,
+      default: SCROLL_DIRECTION.TO_BOTTOM
+    },
   },
-   methods: {
+  computed: {
+    isToTop() {
+      return this.direction === SCROLL_DIRECTION.TO_TOP;
+    },
+    isToBottom() {
+      return this.direction === SCROLL_DIRECTION.TO_BOTTOM;
+    }
+  },
+  methods: {
     cacheHeights(id, height) {
       if (this.heightsMap.has(id)) return;
       if (id === 0) this.heightsMap.set(id, height);
@@ -52,11 +69,6 @@ export default {
 
       if (this.heightsMap.size === this.data.length) {
         console.log('finished store heights map');
-        // setRenderedDataToGetHeight(prev => prev.map((item, i) => {
-        //   const pageKey = pageArray.current.findIndex(key => key === item.id)
-        //   if (pageKey !== -1) return {...item, pageKey};
-        //   else return item;
-        // }))
       }
     },
     handleScroll(e) {
@@ -65,23 +77,24 @@ export default {
       const scrollDirection = offset > this.offset ? SCROLL_DIRECTION.TO_BOTTOM : SCROLL_DIRECTION.TO_TOP;
       if (scrollDirection === SCROLL_DIRECTION.TO_BOTTOM && (offset < this.$parent.$el.clientHeight)) return
       const currentPage = this.pageArray.findIndex(page => this.heightsMap.get(page) > offset)
-      // const lastItemOfCurrentPage = this.pageArray[currentPage];
-      // console.log({ currentPage, lastItemOfCurrentPage });
       this.displayedData = this.data.slice(this.pageArray[currentPage - 1], this.pageArray[currentPage + 2])
 
-      const pageIndexBeforePage = this.pageArray[currentPage - 1];
-      const pageIndexAfterPage = this.pageArray[currentPage + 2];
+      const itemIndexBeforePage = this.pageArray[currentPage - 1];
+      const itemIndexAfterPage = this.pageArray[currentPage + 2];
       this.offset = offset;
-      this.paddingTop = pageIndexBeforePage ? this.heightsMap.get(pageIndexBeforePage - 1) : 0;
-      this.paddingBottom = pageIndexAfterPage ? this.heightsMap.get(this.heightsMap.size - 1) - this.heightsMap.get(pageIndexAfterPage - 1) : 0;
-      console.log({ pageIndexBeforePage, pageIndexAfterPage });
+      this.paddingTop = itemIndexBeforePage ? this.heightsMap.get(itemIndexBeforePage - 1) : 0;
+      this.paddingBottom = itemIndexAfterPage ? this.heightsMap.get(this.heightsMap.size - 1) - this.heightsMap.get(itemIndexAfterPage - 1) : 0;
+      console.log({ itemIndexBeforePage, itemIndexAfterPage });
     },
+    handleCross() {
+      this.$emit('handleCross')
+    }
   },
   created() {
     this.displayedData = this.data;
   },
   mounted() {
-    document.querySelector('.container').addEventListener('scroll', this.handleScroll)
+    this.direction === SCROLL_DIRECTION.TO_TOP && (this.$refs.container.scrollTop = this.$refs.container.scrollHeight);
   },
   updated() {
   },

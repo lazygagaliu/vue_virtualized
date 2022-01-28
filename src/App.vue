@@ -2,6 +2,8 @@
   <div id="app">
     <Virtualized 
       :data="posts"
+      :direction="'to_bottom'"
+      @handleCross="call"
     />
   </div>
 </template>
@@ -20,6 +22,11 @@ export default {
       posts: data,
     }
   },
+  methods: {
+    call() {
+      console.log('entered');
+    }
+  }
 }
 </script>
 
