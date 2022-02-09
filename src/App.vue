@@ -2,15 +2,15 @@
   <div id="app">
     <Virtualized 
       :data="posts"
-      :direction="'to_bottom'"
-      @handleCross="call"
+      :direction="'to_top'"
+      @handleCross="loadMore"
     />
   </div>
 </template>
 
 <script>
 import Virtualized from './components/Virtualized.vue'
-import data from './helper/data';
+import data, { moreData } from './helper/data';
 
 export default {
   name: 'App',
@@ -23,8 +23,11 @@ export default {
     }
   },
   methods: {
-    call() {
+    loadMore() {
       console.log('entered');
+      setTimeout(() => {
+        this.posts = [...this.posts, ...moreData(this.posts.length)]
+      }, 800)
     }
   }
 }
