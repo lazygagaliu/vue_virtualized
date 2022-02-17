@@ -1,18 +1,23 @@
 <template>
-  <div class="container" ref="container" @scroll="handleScroll">
+  <div class="container" ref="container" @scroll.passive="handleScroll">
     <div :class="['float', { reverse: isToTop }]" :style="{ paddingTop: `${paddingTop}px`, paddingBottom: `${paddingBottom}px` }">
-        <div v-for="item in displayedData" :key="item.id">
-          <Item @setHeight="(height) => cacheHeights(item.id, height)">
-              <div>{{ item.id }}</div>
-              <div>{{ item.content }}</div>
-          </Item>
-        </div>
+      <Item 
+        v-for="item in displayedData"
+        :key="item.id"
+        @setHeight="(height) => cacheHeights(item.id, height)"
+        @updateHeight="(height) => updateHeights(item.id, height)"
+      >
+          <div>{{ item.id }}</div>
+          <div @click="handleClickItem(item)">{{ item.content }}</div>
+      </Item>
+      <LoadingComponent v-if="useInfiniteScroll" :options="{ root: $refs.container }" @handleCross="handleCross" />
     </div>
   </div>
 </template>
 
 <script>
 import Item from './Item.vue';
+import LoadingComponent from './LoadingComponent.vue';
 
 const SCROLL_DIRECTION = {
 	TO_TOP: 'to_top',
@@ -23,6 +28,7 @@ export default {
   name: 'Virtualized',
   components: {
     Item,
+    LoadingComponent,
   },
   data() {
     return {
@@ -42,6 +48,10 @@ export default {
       type: String,
       default: SCROLL_DIRECTION.TO_BOTTOM
     },
+    useInfiniteScroll: {
+      type: Boolean,
+      default: false,
+    },
   },
   computed: {
     isToTop() {
@@ -57,8 +67,8 @@ export default {
 
       if (id === 0) this.heightsMap.set(id, height);
       else {
-        const totalHeight = height + this.heightsMap.get(id - 1)
-        const rootHeight = this.$parent.$el.clientHeight
+        const totalHeight = height + this.heightsMap.get(id - 1);
+        const rootHeight = this.$parent.$el.clientHeight;
         this.heightsMap.set(id, totalHeight);
         if (Math.floor(totalHeight / rootHeight) > this.pageArray.length) this.pageArray.push(id);
       }
@@ -67,19 +77,43 @@ export default {
         console.log('finished store heights map');
       }
     },
+    updateHeights(id, diffHeight) {
+      const resetFromPageArrayIndex = this.pageArray.findIndex(i => i >= id);
+      const newPageArray = resetFromPageArrayIndex > -1 ? this.pageArray.slice(0, resetFromPageArrayIndex) : [];
+      const rootHeight = this.$parent.$el.clientHeight;
+      // console.log({
+      //   id,
+      //   resetFromPageArrayIndex,
+      //   newPageArray
+      // });
+      for(let i = id; i < this.heightsMap.size; i++) {
+        const originTotalHeight = this.heightsMap.get(i);
+        const newTotalHeight = originTotalHeight + diffHeight;
+        this.heightsMap.set(i, newTotalHeight);
+        // console.log({
+        //   newTotalHeight,
+        //   rootHeight,
+        //   math: Math.floor(newTotalHeight / rootHeight),
+        //   newPageArray
+        // })
+        if (Math.floor(newTotalHeight / rootHeight) > newPageArray.length) newPageArray.push(i);
+      }
+      this.pageArray = [...newPageArray];
+      // console.log(newPageArray)
+    },
     handleScroll(e) {
       const offset = this.getOffset(e);
 
       const isGoForward = offset > this.offset;
       if (isGoForward && (offset < this.$parent.$el.clientHeight)) return;
       const currentPage = this.pageArray.findIndex(page => this.heightsMap.get(page) > offset)
-      console.log({ currentPage });
+      // console.log({ currentPage });
       this.displayedData = this.data.slice(this.pageArray[currentPage - 1], this.pageArray[currentPage + 2])
       const itemIndexBeforePage = this.pageArray[currentPage - 1];
       const itemIndexAfterPage = this.pageArray[currentPage + 2];
 
       this.calculatePadding(itemIndexBeforePage, itemIndexAfterPage);
-      console.log({ itemIndexBeforePage, itemIndexAfterPage });
+      // console.log({ itemIndexBeforePage, itemIndexAfterPage });
     },
     getOffset(e) {
       return this.isToTop ? e.target.scrollHeight - e.target.scrollTop - e.target.clientHeight : e.target.scrollTop;
@@ -94,17 +128,29 @@ export default {
       }
     },
     handleCross() {
-      // this.$emit('handleCross')
+      // console.log('cross');
+      this.$emit('handleCross')
     },
     concatDisplayDataAndNewData(firstIndexInNewData) {
       this.displayedData = [...this.displayedData, ...this.data.slice(firstIndexInNewData, this.data.length)];
-    }
+    },
+    // temp
+    handleClickItem(item) {
+      item.content = item.content + item.content;
+    },
   },
   watch: {
     data(newData, prevData) {
       if (newData.length !== prevData) {
-        console.log('get more', newData);
         this.concatDisplayDataAndNewData(prevData.length);
+
+        // workaround for fetching more data while the direction is toTop, scroll position will jump to the very top without this workaround
+        this.$nextTick(() => {
+          if (this.isToTop && this.$refs.container.scrollTop === 0) this.$refs.container.scrollTo({
+            top: this.$refs.container.scrollHeight - this.heightsMap.get(prevData.length - 1),
+            behavior: 'auto',
+          });
+        })
       }
     },
   },
@@ -115,6 +161,7 @@ export default {
     this.isToTop && (this.$refs.container.scrollTop = this.$refs.container.scrollHeight);
   },
   updated() {
+    // console.log(this.$refs.container.scrollTop);
   },
 }
 </script>
@@ -122,7 +169,7 @@ export default {
 <style scoped>
 .container {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   overflow: auto;
   position: relative;
 }
@@ -132,7 +179,7 @@ export default {
   top: 0;
   left: 0;
   width: 100%;
-  min-height: 100vh;
+  min-height: 100%;
 }
 
 .reverse {

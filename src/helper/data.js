@@ -5,7 +5,7 @@ const contents = { content1, content2, content3 }
 
 const getRandomContent = () => Math.ceil(Math.random() * 3)
 
-const data = Array.from({ length: 100 }, (_, i) => ({
+const data = Array.from({ length: 30 }, (_, i) => ({
 	id: i,
 	content: contents[`content${getRandomContent()}`]
 }))
