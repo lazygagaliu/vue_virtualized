@@ -5,18 +5,24 @@
       :direction="'to_top'"
       useInfiniteScroll
       @handleCross="loadMore"
-    />
+    >
+      <template v-slot:child="child">
+        <Child :item="child.item" />
+      </template>
+    </Virtualized>
   </div>
 </template>
 
 <script>
 import Virtualized from './components/Virtualized.vue'
+import Child from './components/Child.vue'
 import data, { moreData } from './helper/data';
 
 export default {
   name: 'App',
   components: {
-    Virtualized
+    Virtualized,
+    Child
   },
   data() {
     return {

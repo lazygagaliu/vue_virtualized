@@ -4,11 +4,10 @@
       <Item 
         v-for="item in displayedData"
         :key="item.id"
-        @setHeight="(height) => cacheHeights(item.id, height)"
-        @updateHeight="(height) => updateHeights(item.id, height)"
+        @setHeight="(height) => cacheHeights(item.serialNumber, height)"
+        @updateHeight="(height) => updateHeights(item.serialNumber, height)"
       >
-          <div>{{ item.id }}</div>
-          <div @click="handleClickItem(item)">{{ item.content }}</div>
+        <slot name="child" :item="item"></slot>
       </Item>
       <LoadingComponent v-if="useInfiniteScroll" :options="{ root: $refs.container }" @handleCross="handleCross" />
     </div>
@@ -32,6 +31,7 @@ export default {
   },
   data() {
     return {
+      sequenceData: [],
       heightsMap: new Map(),
       pageArray: [],
       displayedData: [],
@@ -63,12 +63,13 @@ export default {
   },
   methods: {
     cacheHeights(id, height) {
+      console.log(id, height);
       if (this.heightsMap.has(id)) return;
 
       if (id === 0) this.heightsMap.set(id, height);
       else {
         const totalHeight = height + this.heightsMap.get(id - 1);
-        const rootHeight = this.$parent.$el.clientHeight;
+        const rootHeight = this.$el.parentNode.clientHeight;
         this.heightsMap.set(id, totalHeight);
         if (Math.floor(totalHeight / rootHeight) > this.pageArray.length) this.pageArray.push(id);
       }
@@ -80,7 +81,7 @@ export default {
     updateHeights(id, diffHeight) {
       const resetFromPageArrayIndex = this.pageArray.findIndex(i => i >= id);
       const newPageArray = resetFromPageArrayIndex > -1 ? this.pageArray.slice(0, resetFromPageArrayIndex) : [];
-      const rootHeight = this.$parent.$el.clientHeight;
+      const rootHeight = this.$el.parentNode.clientHeight;
       // console.log({
       //   id,
       //   resetFromPageArrayIndex,
@@ -105,10 +106,10 @@ export default {
       const offset = this.getOffset(e);
 
       const isGoForward = offset > this.offset;
-      if (isGoForward && (offset < this.$parent.$el.clientHeight)) return;
+      if (isGoForward && (offset < this.$el.parentNode.clientHeight)) return;
       const currentPage = this.pageArray.findIndex(page => this.heightsMap.get(page) > offset)
       // console.log({ currentPage });
-      this.displayedData = this.data.slice(this.pageArray[currentPage - 1], this.pageArray[currentPage + 2])
+      this.displayedData = this.sequenceData.slice(this.pageArray[currentPage - 1], this.pageArray[currentPage + 2])
       const itemIndexBeforePage = this.pageArray[currentPage - 1];
       const itemIndexAfterPage = this.pageArray[currentPage + 2];
 
@@ -131,8 +132,10 @@ export default {
       // console.log('cross');
       this.$emit('handleCross')
     },
-    concatDisplayDataAndNewData(firstIndexInNewData) {
-      this.displayedData = [...this.displayedData, ...this.data.slice(firstIndexInNewData, this.data.length)];
+    concatOldDataAndNewData(firstIndexInNewData) {
+      const newData = this.data.slice(firstIndexInNewData, this.data.length).map((item, i) => ({ ...item, serialNumber: firstIndexInNewData + i }))
+      this.displayedData = [...this.displayedData, ...newData];
+      this.sequenceData = [...this.sequenceData, ...newData];
     },
     // temp
     handleClickItem(item) {
@@ -142,7 +145,7 @@ export default {
   watch: {
     data(newData, prevData) {
       if (newData.length !== prevData) {
-        this.concatDisplayDataAndNewData(prevData.length);
+        this.concatOldDataAndNewData(prevData.length);
 
         // workaround for fetching more data while the direction is toTop, scroll position will jump to the very top without this workaround
         this.$nextTick(() => {
@@ -155,7 +158,9 @@ export default {
     },
   },
   created() {
-    this.displayedData = this.data;
+    const sequenceData = this.data.map((item, i) => ({ ...item, serialNumber: i }));
+    this.sequenceData = sequenceData;
+    this.displayedData = sequenceData;
   },
   mounted() {
     this.isToTop && (this.$refs.container.scrollTop = this.$refs.container.scrollHeight);
