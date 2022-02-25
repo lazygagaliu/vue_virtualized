@@ -18,8 +18,8 @@ export const secondData = Array.from({ length: 30 }, (_, i) => ({
 	content: contents[`content${getRandomContent()}`]
 }))
 
-export const moreData = (id) => Array.from({ length: 30 }, (_, i) => ({
-	id: id + i,
+export const moreData = () => Array.from({ length: 30 }, () => ({
+	id: Math.random(),
 	content: contents[`content${getRandomContent()}`]
 }))
 

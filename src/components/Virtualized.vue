@@ -6,7 +6,7 @@
         :key="item.id"
         @setHeight="(height) => cacheHeights(item.serialNumber, height)"
         @updateHeight="(height) => updateHeights(item.serialNumber, height)"
-        @click.native="handleClickItem(item)"
+        @handleClick="handleClickItem(item)"
       >
         <slot name="child" :item="item"></slot>
       </Item>
@@ -40,8 +40,11 @@ export default {
       paddingTop: 0,
       paddingBottom: 0,
       unshiftDataLength: 0,
-      // unshiftDataTotalLength: 0,
       unshiftDataHeightArray: [],
+      itemToBeDeleted: {
+        serialNumber: null,
+        height: 0,
+      },
     }
   },
   props: {
@@ -180,13 +183,24 @@ export default {
       this.displayedData = [...this.displayedData, ...newData];
       this.sequenceData = [...this.sequenceData, ...newData];
     },
-    concatNewDataAndOldData() {
-      
-    },
+    concatNewDataAndOldData() {},
     // temp
     handleClickItem(item) {
       // dynamic height
-      item.content = item.content + item.content;
+      // item.content = item.content + item.content;
+      this.$emit('handleClickItem');
+    },
+    handleDeleteItem(id) {
+      console.log('help me to delete item', id, this.data.length);
+      const deleteItem = this.sequenceData.find(item => item.id === id);
+      console.log(deleteItem);
+      if (deleteItem) {
+        const itemSerialNumber = deleteItem.serialNumber;
+        this.itemToBeDeleted = {
+          serialNumber: itemSerialNumber,
+          height: itemSerialNumber === 0 ? this.heightsMap.get(itemSerialNumber) : this.heightsMap.get(itemSerialNumber) - this.heightsMap.get(itemSerialNumber - 1),
+        }
+      }
     },
   },
   watch: {
@@ -198,6 +212,7 @@ export default {
           this.concatOldDataAndNewData(prevData.length)
         } else {
           // unshift
+          // Todo: maybe move the logic below to unshiftDataLength watcher
           this.unshiftDataLength = newData.length - prevData.length;
           const comingData = newData.slice(0, newData.length - prevData.length);
           this.sequenceData = [...comingData, ...this.sequenceData].map((item, i) => ({ ...item, serialNumber: i }));
@@ -207,18 +222,29 @@ export default {
           const newFirstDisplay = firstDisplay + this.unshiftDataLength;
           const newLastDisplay = lastDisplay + this.unshiftDataLength;
           this.displayedData = this.sequenceData.slice(0, this.unshiftDataLength).concat(this.sequenceData.slice(newFirstDisplay, newLastDisplay + 1));
-          // this.displayedData = this.sequenceData.slice(this.pageArray[this.currentPage - 1], this.pageArray[this.currentPage + 2])
-          // this.concatNewDataAndOldData
         }
-      } else if (newData.length < prevData.length) {
-        // delete
       }
-
       // Todo: same length but different content
-
-      // if (newData.length !== prevData) {
-      //   this.concatOldDataAndNewData(prevData.length);
-      // }
+    },
+    itemToBeDeleted(value, oldValue) {
+      console.log('here', { value, oldValue });
+      const { serialNumber, height } = value
+      const resetFromPageArrayIndex = this.pageArray.findIndex(i => i >= serialNumber);
+      const newPageArray = resetFromPageArrayIndex > -1 ? this.pageArray.slice(0, resetFromPageArrayIndex) : [];
+      const rootHeight = this.$el.parentNode.clientHeight;
+      const size = this.heightsMap.size;
+      for (let i = serialNumber; i < size; i++) {
+        if (i === size - 1) {
+          this.heightsMap.delete(i)
+        } else {
+          const updateHeight = this.heightsMap.get(i + 1) - height;
+          this.heightsMap.set(i, updateHeight);
+          if (Math.floor(updateHeight / rootHeight) > newPageArray.length) newPageArray.push(i);
+        }
+      }
+      this.pageArray = [...newPageArray]
+      this.sequenceData = this.sequenceData.filter(item => item.serialNumber !== serialNumber).map((item, i) => ({ ...item, serialNumber: i }));
+      this.displayedData = this.sequenceData.slice(this.pageArray[this.currentPage - 1], this.pageArray[this.currentPage + 2]);
     },
   },
   created() {

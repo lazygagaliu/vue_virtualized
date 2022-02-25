@@ -1,5 +1,5 @@
 <template>
-<div ref="ref">
+<div ref="ref" @click="handleClick">
 	<slot></slot>
 </div>
 </template>
@@ -29,5 +29,10 @@ export default {
 
 		this.observer.observe(this.$refs.ref);
 	},
+	methods: {
+		handleClick() {
+			this.$emit('handleClick');
+		}
+	}
 }
 </script>

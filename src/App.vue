@@ -9,7 +9,7 @@
         @handleCross="loadMore"
       >
         <template v-slot:child="{ item }">
-          <Child :item="item" @click="deleteItem(item.id)" />
+          <Child :item="item" @click.native="deleteItem(item.id)"/>
         </template>
       </Virtualized>
     </div>
@@ -33,13 +33,15 @@ export default {
     return {
       posts: data,
       scrollDirection: 'to_top',
+      n: 30,
     }
   },
   methods: {
     loadMore(prevHeight) {
       console.log('entered');
       setTimeout(() => {
-        this.posts = [...this.posts, ...moreData(this.posts.length)]
+        this.posts = [...this.posts, ...moreData(this.n)]
+        this.n = this.posts.length;
         // workaround for fetching more data while the direction is toTop, scroll position will jump to the very top without this workaround
         this.$nextTick(() => {
           // debugger
@@ -77,7 +79,11 @@ export default {
         });
       });
     },
-    deleteItem() {},
+    deleteItem(id) {
+      console.log('delete', id);
+      this.posts = this.posts.filter(item => item.id !== id);
+      this.$refs.virtualized.handleDeleteItem(id);
+    },
   }
 }
 </script>
