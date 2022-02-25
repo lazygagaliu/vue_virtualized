@@ -6,6 +6,7 @@
         :key="item.id"
         @setHeight="(height) => cacheHeights(item.serialNumber, height)"
         @updateHeight="(height) => updateHeights(item.serialNumber, height)"
+        @click.native="handleClickItem(item)"
       >
         <slot name="child" :item="item"></slot>
       </Item>
@@ -35,8 +36,12 @@ export default {
       heightsMap: new Map(),
       pageArray: [],
       displayedData: [],
+      currentPage: 0,
       paddingTop: 0,
       paddingBottom: 0,
+      unshiftDataLength: 0,
+      // unshiftDataTotalLength: 0,
+      unshiftDataHeightArray: [],
     }
   },
   props: {
@@ -64,21 +69,58 @@ export default {
   methods: {
     cacheHeights(id, height) {
       console.log(id, height);
-      if (this.heightsMap.has(id)) return;
-
-      if (id === 0) this.heightsMap.set(id, height);
-      else {
-        const totalHeight = height + this.heightsMap.get(id - 1);
-        const rootHeight = this.$el.parentNode.clientHeight;
-        this.heightsMap.set(id, totalHeight);
-        if (Math.floor(totalHeight / rootHeight) > this.pageArray.length) this.pageArray.push(id);
+      if (this.unshiftDataLength > 0) {
+        const totalHeight = id === 0 ? height : this.unshiftDataHeightArray[this.unshiftDataHeightArray.length - 1] + height;
+        this.unshiftDataHeightArray.push(totalHeight);
+        if (this.unshiftDataHeightArray.length === this.unshiftDataLength) {
+          this.recalculateHeightsMapAndPageArray();
+          this.resetUnshiftRelatedData();
+        }
+      } else {
+        if (this.heightsMap.has(id)) return;
+        if (id === 0) this.heightsMap.set(id, height);
+        else {
+          const totalHeight = height + this.heightsMap.get(id - 1);
+          const rootHeight = this.$el.parentNode.clientHeight;
+          this.heightsMap.set(id, totalHeight);
+          if (Math.floor(totalHeight / rootHeight) > this.pageArray.length) this.pageArray.push(id);
+        }
       }
 
       if (this.heightsMap.size === this.data.length) {
         console.log('finished store heights map');
       }
     },
+    recalculateHeightsMapAndPageArray() {
+      const tempMap = new Map();
+      const tempPageArray = [];
+      const oldHeightsMapSize = this.heightsMap.size;
+      // add new height to the front
+      this.unshiftDataHeightArray.forEach((height, index) => {
+        console.log(index);
+        tempMap.set(index, height);
+        if (index !== 0) {
+          const rootHeight = this.$el.parentNode.clientHeight;
+          if (Math.floor(height / rootHeight) > tempPageArray.length) tempPageArray.push(index);
+        }
+      })
+      for (let i = 0; i < oldHeightsMapSize; i++) {
+        const newSerialNumber = i + this.unshiftDataLength;
+        const newHeight = this.heightsMap.get(i) + this.unshiftDataHeightArray[this.unshiftDataHeightArray.length - 1];
+        tempMap.set(newSerialNumber, newHeight);
+        const rootHeight = this.$el.parentNode.clientHeight;
+          if (Math.floor(newHeight / rootHeight) > tempPageArray.length) tempPageArray.push(newSerialNumber);
+      }
+      this.heightsMap = tempMap;
+      this.pageArray = tempPageArray;
+    },
+    recalculatePageArray() {},
+    resetUnshiftRelatedData() {
+      this.unshiftDataLength = 0;
+      this.unshiftDataHeightArray = [];
+    },
     updateHeights(id, diffHeight) {
+      console.log('update height', { id });
       const resetFromPageArrayIndex = this.pageArray.findIndex(i => i >= id);
       const newPageArray = resetFromPageArrayIndex > -1 ? this.pageArray.slice(0, resetFromPageArrayIndex) : [];
       const rootHeight = this.$el.parentNode.clientHeight;
@@ -114,6 +156,7 @@ export default {
       const itemIndexAfterPage = this.pageArray[currentPage + 2];
 
       this.calculatePadding(itemIndexBeforePage, itemIndexAfterPage);
+      this.currentPage = currentPage;
       // console.log({ itemIndexBeforePage, itemIndexAfterPage });
     },
     getOffset(e) {
@@ -130,31 +173,52 @@ export default {
     },
     handleCross() {
       // console.log('cross');
-      this.$emit('handleCross')
+      this.$emit('handleCross', this.heightsMap.get(this.data.length - 1))
     },
     concatOldDataAndNewData(firstIndexInNewData) {
       const newData = this.data.slice(firstIndexInNewData, this.data.length).map((item, i) => ({ ...item, serialNumber: firstIndexInNewData + i }))
       this.displayedData = [...this.displayedData, ...newData];
       this.sequenceData = [...this.sequenceData, ...newData];
     },
+    concatNewDataAndOldData() {
+      
+    },
     // temp
     handleClickItem(item) {
+      // dynamic height
       item.content = item.content + item.content;
     },
   },
   watch: {
     data(newData, prevData) {
-      if (newData.length !== prevData) {
-        this.concatOldDataAndNewData(prevData.length);
+      // add
+      if (newData.length > prevData.length) {
+        if (newData[0].id === prevData[0].id) {
+          // push
+          this.concatOldDataAndNewData(prevData.length)
+        } else {
+          // unshift
+          this.unshiftDataLength = newData.length - prevData.length;
+          const comingData = newData.slice(0, newData.length - prevData.length);
+          this.sequenceData = [...comingData, ...this.sequenceData].map((item, i) => ({ ...item, serialNumber: i }));
 
-        // workaround for fetching more data while the direction is toTop, scroll position will jump to the very top without this workaround
-        this.$nextTick(() => {
-          if (this.isToTop && this.$refs.container.scrollTop === 0) this.$refs.container.scrollTo({
-            top: this.$refs.container.scrollHeight - this.heightsMap.get(prevData.length - 1),
-            behavior: 'auto',
-          });
-        })
+          const firstDisplay = this.displayedData[0].serialNumber;
+          const lastDisplay = this.displayedData[this.displayedData.length - 1].serialNumber;
+          const newFirstDisplay = firstDisplay + this.unshiftDataLength;
+          const newLastDisplay = lastDisplay + this.unshiftDataLength;
+          this.displayedData = this.sequenceData.slice(0, this.unshiftDataLength).concat(this.sequenceData.slice(newFirstDisplay, newLastDisplay + 1));
+          // this.displayedData = this.sequenceData.slice(this.pageArray[this.currentPage - 1], this.pageArray[this.currentPage + 2])
+          // this.concatNewDataAndOldData
+        }
+      } else if (newData.length < prevData.length) {
+        // delete
       }
+
+      // Todo: same length but different content
+
+      // if (newData.length !== prevData) {
+      //   this.concatOldDataAndNewData(prevData.length);
+      // }
     },
   },
   created() {
