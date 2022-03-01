@@ -67,7 +67,7 @@ export default {
     },
     isToBottom() {
       return this.direction === SCROLL_DIRECTION.TO_BOTTOM;
-    }
+    },
   },
   methods: {
     cacheHeights(id, height) {
@@ -147,11 +147,18 @@ export default {
       this.pageArray = [...newPageArray];
       // console.log(newPageArray)
     },
-    handleScroll(e) {
-      const offset = this.getOffset(e);
+    handleScroll() {
+      const offset = this.getOffset();
 
       const isGoForward = offset > this.offset;
       if (isGoForward && (offset < this.$el.parentNode.clientHeight)) return;
+      this.setDisplayedDataAndPadding(offset);
+    },
+    getOffset() {
+      // Todo: computed?!
+      return this.isToTop ? this.$refs.container.scrollHeight - this.$refs.container.scrollTop - this.$refs.container.clientHeight : this.$refs.container.scrollTop;
+    },
+    setDisplayedDataAndPadding(offset) {
       const currentPage = this.pageArray.findIndex(page => this.heightsMap.get(page) > offset)
       // console.log({ currentPage });
       this.displayedData = this.sequenceData.slice(this.pageArray[currentPage - 1], this.pageArray[currentPage + 2])
@@ -161,9 +168,6 @@ export default {
       this.calculatePadding(itemIndexBeforePage, itemIndexAfterPage);
       this.currentPage = currentPage;
       // console.log({ itemIndexBeforePage, itemIndexAfterPage });
-    },
-    getOffset(e) {
-      return this.isToTop ? e.target.scrollHeight - e.target.scrollTop - e.target.clientHeight : e.target.scrollTop;
     },
     calculatePadding(itemIndexBeforePage, itemIndexAfterPage) {
       if (this.isToTop) {
@@ -185,7 +189,7 @@ export default {
     },
     concatNewDataAndOldData() {},
     // temp
-    handleClickItem(item) {
+    handleClickItem() {
       // dynamic height
       // item.content = item.content + item.content;
       this.$emit('handleClickItem');
@@ -202,6 +206,12 @@ export default {
         }
       }
     },
+    handleChangeItem(id, updatedItem) {
+      console.log('help me to change item', id);
+      const itemIndex = this.sequenceData.findIndex(item => item.id === id);
+      this.sequenceData[itemIndex] = {...updatedItem, serialNumber: itemIndex};
+      this.setDisplayedDataAndPadding(this.getOffset());
+    }
   },
   watch: {
     data(newData, prevData) {
@@ -223,8 +233,10 @@ export default {
           const newLastDisplay = lastDisplay + this.unshiftDataLength;
           this.displayedData = this.sequenceData.slice(0, this.unshiftDataLength).concat(this.sequenceData.slice(newFirstDisplay, newLastDisplay + 1));
         }
+      } else if (newData.length === prevData.length) {
+        // Todo: same length but different content
+        console.log('update in watch');
       }
-      // Todo: same length but different content
     },
     itemToBeDeleted(value, oldValue) {
       console.log('here', { value, oldValue });
@@ -245,6 +257,8 @@ export default {
       this.pageArray = [...newPageArray]
       this.sequenceData = this.sequenceData.filter(item => item.serialNumber !== serialNumber).map((item, i) => ({ ...item, serialNumber: i }));
       this.displayedData = this.sequenceData.slice(this.pageArray[this.currentPage - 1], this.pageArray[this.currentPage + 2]);
+      // recalculate page and displayed data after deleting item
+      this.setDisplayedDataAndPadding(this.getOffset());
     },
   },
   created() {

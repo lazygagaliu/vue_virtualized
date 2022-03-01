@@ -9,7 +9,7 @@
         @handleCross="loadMore"
       >
         <template v-slot:child="{ item }">
-          <Child :item="item" @click.native="deleteItem(item.id)"/>
+          <Child :item="item" @click.native="expandItem(item.id)"/>
         </template>
       </Virtualized>
     </div>
@@ -32,7 +32,7 @@ export default {
   data() {
     return {
       posts: data,
-      scrollDirection: 'to_top',
+      scrollDirection: 'to_bottom',
       n: 30,
     }
   },
@@ -78,6 +78,12 @@ export default {
           behavior: 'auto',
         });
       });
+    },
+    expandItem(id) {
+      console.log('expand', id);
+      const updatedItem = this.posts.find(item => item.id === id);
+      updatedItem.content += updatedItem.content;
+      this.$refs.virtualized.handleChangeItem(id, updatedItem);
     },
     deleteItem(id) {
       console.log('delete', id);
