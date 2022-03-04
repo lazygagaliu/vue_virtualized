@@ -127,25 +127,13 @@ export default {
       const resetFromPageArrayIndex = this.pageArray.findIndex(i => i >= id);
       const newPageArray = resetFromPageArrayIndex > -1 ? this.pageArray.slice(0, resetFromPageArrayIndex) : [];
       const rootHeight = this.$el.parentNode.clientHeight;
-      // console.log({
-      //   id,
-      //   resetFromPageArrayIndex,
-      //   newPageArray
-      // });
       for(let i = id; i < this.heightsMap.size; i++) {
         const originTotalHeight = this.heightsMap.get(i);
         const newTotalHeight = originTotalHeight + diffHeight;
         this.heightsMap.set(i, newTotalHeight);
-        // console.log({
-        //   newTotalHeight,
-        //   rootHeight,
-        //   math: Math.floor(newTotalHeight / rootHeight),
-        //   newPageArray
-        // })
         if (Math.floor(newTotalHeight / rootHeight) > newPageArray.length) newPageArray.push(i);
       }
       this.pageArray = [...newPageArray];
-      // console.log(newPageArray)
     },
     handleScroll() {
       const offset = this.getOffset();
@@ -179,7 +167,6 @@ export default {
       }
     },
     handleCross() {
-      // console.log('cross');
       this.$emit('handleCross', this.heightsMap.get(this.data.length - 1))
     },
     concatOldDataAndNewData(firstIndexInNewData) {
@@ -187,7 +174,17 @@ export default {
       this.displayedData = [...this.displayedData, ...newData];
       this.sequenceData = [...this.sequenceData, ...newData];
     },
-    concatNewDataAndOldData() {},
+    concatNewDataAndOldData(comingData) {
+      this.sequenceData = [...comingData, ...this.sequenceData].map((item, i) => ({ ...item, serialNumber: i }));
+      this.setDisplayedDataByUnshiftData();
+    },
+    setDisplayedDataByUnshiftData() {
+      const firstDisplay = this.displayedData[0].serialNumber;
+      const lastDisplay = this.displayedData[this.displayedData.length - 1].serialNumber;
+      const newFirstDisplay = firstDisplay + this.unshiftDataLength;
+      const newLastDisplay = lastDisplay + this.unshiftDataLength;
+      this.displayedData = this.sequenceData.slice(0, this.unshiftDataLength).concat(this.sequenceData.slice(newFirstDisplay, newLastDisplay + 1));
+    },
     // temp
     handleClickItem() {
       // dynamic height
@@ -222,16 +219,9 @@ export default {
           this.concatOldDataAndNewData(prevData.length)
         } else {
           // unshift
-          // Todo: maybe move the logic below to unshiftDataLength watcher
           this.unshiftDataLength = newData.length - prevData.length;
           const comingData = newData.slice(0, newData.length - prevData.length);
-          this.sequenceData = [...comingData, ...this.sequenceData].map((item, i) => ({ ...item, serialNumber: i }));
-
-          const firstDisplay = this.displayedData[0].serialNumber;
-          const lastDisplay = this.displayedData[this.displayedData.length - 1].serialNumber;
-          const newFirstDisplay = firstDisplay + this.unshiftDataLength;
-          const newLastDisplay = lastDisplay + this.unshiftDataLength;
-          this.displayedData = this.sequenceData.slice(0, this.unshiftDataLength).concat(this.sequenceData.slice(newFirstDisplay, newLastDisplay + 1));
+          this.concatNewDataAndOldData(comingData);
         }
       } else if (newData.length === prevData.length) {
         // Todo: same length but different content
